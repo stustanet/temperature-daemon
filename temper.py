@@ -7,9 +7,16 @@
 #
 # This code is licensed under the GNU public license (GPL). See LICENSE.md for details.
 
+# originally from: https://github.com/padelt/temper-python
+
+# minor updates (calibration, bus/device access) by:
+# Maximilian Engelhardt <maxi@stusta.de>
+# Johannes Naab <jn@stusta.de>
+
 import usb
 import sys
 import struct
+import time
 
 VIDPIDs = [(0x0c45L,0x7401L)]
 REQ_INT_LEN = 8
@@ -17,11 +24,15 @@ REQ_BULK_LEN = 8
 TIMEOUT = 2000
 
 class TemperDevice():
-    def __init__(self, device):
+    def __init__(self, bus, device):
         self._device = device
+        self._bus = bus
         self._handle = None
 
-    def get_temperature(self, format='celsius'):
+    def get_id(self):
+        return self._bus.dirname, self._device.filename
+
+    def get_temperature(self, calibration=0, format='celsius'):
         try:
             if not self._handle:
                 self._handle = self._device.open()
@@ -48,7 +59,9 @@ class TemperDevice():
             self._control_transfer(self._handle, "\x01\x80\x33\x01\x00\x00\x00\x00") # uTemperatura
             data = self._interrupt_read(self._handle)
             data_s = "".join([chr(byte) for byte in data])
-            temp_c = 125.0/32000.0*(struct.unpack('>h', data_s[2:4])[0])
+            temp_c = (struct.unpack('>h', data_s[2:4])[0])
+            temp_c += calibration
+            temp_c *= 125.0/32000.0
             if format == 'celsius':
                 return temp_c
             elif format == 'fahrenheit':
@@ -82,16 +95,22 @@ class TemperDevice():
 class TemperHandler():
     def __init__(self):
         busses = usb.busses()
-        self._devices = []
+        # key: (bus.dirname, dev.filename), value: TemperDevice
+        self._devices = {}
         for bus in busses:
-            self._devices.extend([TemperDevice(x) for x in bus.devices if (x.idVendor,x.idProduct) in VIDPIDs])
+            for x in bus.devices:
+                if (x.idVendor,x.idProduct) in VIDPIDs:
+                    tdev = TemperDevice(bus, x)
+                    self._devices[tdev.get_id()] = tdev
+
 
     def get_devices(self):
         return self._devices
 
 if __name__ == '__main__':
     th = TemperHandler()
-    devs = th.get_devices()
-    print "Found %i devices" % len(devs)
-    for i, dev in enumerate(devs):
-        print "Device #%i: %0.1f°C %0.1f°F" % (i, dev.get_temperature(), dev.get_temperature(format="fahrenheit"))
+    for i, dev in th._devices.iteritems():
+        try:
+            print "Device %s: %0.1f°C %0.1f°F" % (i[0]+"/"+i[1], dev.get_temperature(calibration=0), dev.get_temperature(format="fahrenheit"))
+        except Exception as e:
+            print e
