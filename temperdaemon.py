@@ -29,7 +29,10 @@ MAX_OUTDOOR_DIFF = 10
 
 MAILINTERVAL = 3600
 
-DEBUG = False
+#DEBUG = False
+DEBUG = True
+
+SPAM = False
 
 class TempReader(threading.Thread):
     def __init__(self, mq):
@@ -123,7 +126,7 @@ oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$
                 src = "Temperator <root@hugin.stusta.mhn.de>"
                 msg['Subject'] = u"Temperaturalarm Serverraum"
                 msg['From'] = src
-                if DEBUG:
+                if SPAM:
                     dst = ["jn@stusta.de", "maxi@stusta.de"]
                 else:
                     dst = ["admins@stustanet.de"]
@@ -132,6 +135,7 @@ oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$
 
                 self.mq.put((src, dst, msg.as_string()))
 
+            sys.stdout.flush()
             time.sleep(READINGINTERVAL)
 
 
@@ -185,7 +189,7 @@ class Exp0rt0r(threading.Thread):
                             (HOSTNAME, temp_sensor.name, EXPORTINTERVAL, temp_c)
                     try:
                         if DEBUG:
-                            print "write", data
+                            print "write", data.strip()
                         self.socket.send(data)
                     except Exception as e:
                         if DEBUG:
