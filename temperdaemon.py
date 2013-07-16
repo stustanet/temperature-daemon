@@ -29,10 +29,11 @@ MAX_OUTDOOR_DIFF = 10
 
 MAILINTERVAL = 3600
 
-#DEBUG = False
-DEBUG = True
+DEBUG = False
+#DEBUG = True
 
 SPAM = False
+#SPAM = True
 
 class TempReader(threading.Thread):
     def __init__(self, mq):
@@ -175,6 +176,7 @@ class Exp0rt0r(threading.Thread):
                 s = socket.socket(socket.AF_UNIX)
                 try:
                     s.connect(UNIX_SOCKET)
+                    s.setblocking(False)
                     self.socket = s
                 except Exception as e:
                     if DEBUG:
@@ -189,8 +191,24 @@ class Exp0rt0r(threading.Thread):
                             (HOSTNAME, temp_sensor.name, EXPORTINTERVAL, temp_c)
                     try:
                         if DEBUG:
-                            print "write", data.strip()
+                            print "socket write", data.strip()
                         self.socket.send(data)
+
+                        recv = []
+                        while True:
+                            try:
+                                recv = self.socket.recv(2**12)
+                            except socket.error as e:
+                                if e.errno == 11:  #EAGAIN
+                                    break
+                                raise e
+
+                        recv = ''.join(recv)
+
+                        if DEBUG:
+                            print "socket read", recv.strip()
+
+
                     except Exception as e:
                         if DEBUG:
                             print e
