@@ -12,6 +12,7 @@ import threading
 import time
 import Queue
 import smtplib
+import ow
 from email.mime.text import MIMEText
 from email.Utils import formatdate
 
@@ -59,14 +60,30 @@ class TempReader(threading.Thread):
                         except:
                             pass
 
+                ow.init( 'localhost:4304' )
+                for a, owid in iter(temperature_sensors):
+                    if a == 'serial':
+                        temp_sensor = temperature_sensors.get((a, owid))
+
+                        try:
+                            temp_c = float(ow.Sensor( '/uncached/'+ owid ).temperature)
+                            if temp_c != float('85'):
+                                temp_sensor.update(temp_c)
+                        except:
+                            pass
+                ow.finish()
+
                 self.iteration += 1
 
             except:
                 pass
 
-            floor = temperature_sensors_by_name['floor'].temperature
-            ceiling = temperature_sensors_by_name['ceiling'].temperature
-            outdoor = temperature_sensors_by_name['outdoor'].temperature
+
+            floor = temperature_sensors_usb_by_name['floor'].temperature
+            floorserial = temperature_sensors_serial_by_name['floorserial'].temperature
+            ceiling = temperature_sensors_usb_by_name['ceiling'].temperature
+            ceilserial = temperature_sensors_serial_by_name['ceilserial'].temperature
+            outdoor = temperature_sensors_usb_by_name['outdoor'].temperature
 
             # error case: some sensor is not working!
             if floor is None:
@@ -221,7 +238,8 @@ class Exp0rt0r(threading.Thread):
             time.sleep(EXPORTINTERVAL)
 
 
-class TempSensor():
+#TODO: baseclass TempSensor?
+class TempSensorUSB():
     def __init__(self, name, calibration, bus, device):
         self.name = name
         self.calibration = calibration
@@ -260,13 +278,53 @@ class TempSensor():
                     (self.name, self.bus, self.device, self.calibration, self.temperature, self.last_updated,
                             self.exported)
 
+class TempSensorSerial():
+    def __init__(self, name, owid):
+        self.name = name
+        self.owid = owid
+
+        self.last_updated = None
+        self.temperature = None
+        self.exported = True
+
+        self._lock = threading.RLock()
+
+    def update(self, temperature):
+        with self._lock:
+            self.temperature = temperature
+            self.exported = False
+            self.last_updated = time.time()
+        if DEBUG:
+            print "update", self
+
+    def get_export(self):
+        with self._lock:
+            exported = self.exported
+            self.exported = True
+            if DEBUG:
+                print "read", self
+            return self.temperature, exported
+
+    def __str__(self):
+        with self._lock:
+            return "%s (owid:%s) temperature: %s, last_updated:%s, exported:%s" % \
+                    (self.name, self.owid, self.temperature, self.last_updated,
+                            self.exported)
+
 temperature_sensors = {}
-temperature_sensors_by_name = {}
+#TODO:Type in key, only one dict?
+temperature_sensors_usb_by_name = {}
+temperature_sensors_serial_by_name = {}
 
 for name, calibration, bus, device in [('floor', 500, '001', '001'), ('ceiling', 300, '002', '001'), ('outdoor', 330, '003', '001')]:
-    temperature_sensors[(bus, device)] = TempSensor(name, calibration, bus, device)
+    temperature_sensors[(bus, device)] = TempSensorUSB(name, calibration, bus, device)
 
-    temperature_sensors_by_name[name] = temperature_sensors[(bus, device)]
+    temperature_sensors_usb_by_name[name] = temperature_sensors[(bus, device)]
+
+for name, owid in [('floorserial', '10.C238A5010800'), ('ceilserial', '10.0C33A5010800')]:
+    temperature_sensors[('serial', owid)] = TempSensorSerial(name, owid)
+
+    temperature_sensors_serial_by_name[name] = temperature_sensors[('serial', owid)]
 
 if __name__ == "__main__":
     mailqueue = Queue.Queue()
