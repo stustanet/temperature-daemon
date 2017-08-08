@@ -31,6 +31,8 @@ HOSTNAME = "hugin.stusta.mhn.de"
 
 FLOOR_LIMIT = 25
 CEILING_LIMIT = 30
+CEILING_LIMIT_EMR = 42
+FLOOR_LIMIT_EMR = 38
 MAX_OUTDOOR_DIFF = 15
 
 MAILINTERVAL = 3600
@@ -88,16 +90,19 @@ oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$
 
         msg = MIMEText(body.format(floor, ceiling, outdoor),  _charset="UTF-8")
         src = "Temperator <root@hugin.stusta.mhn.de>"
-        msg['Subject'] = u"Temperaturalarm Serverraum"
+        if (ceiling>CEILING_LIMIT_EMR)or(floor>FLOOR_LIMIT_EMR):
+            msg['Subject'] = u"TEMPERATURNOTFALL Serverraum!"
+        else:
+            msg['Subject'] = u"Temperaturalarm Serverraum"
         msg['From'] = src
         if SPAM:
-            dst = ["jn@stusta.de", "maxi@stusta.de", "markus.hefele@stusta.net"]
+            dst = ["markus.hefele@stusta.net"]
         else:
             dst = ["admins@stustanet.de"]
         msg['To'] = ", ".join(dst)
         msg['Date'] = formatdate(localtime=True)
 
-        self.mail_queue.put((src, dst, msg.as_string()))
+        #self.mail_queue.put((src, dst, msg.as_string()))
 
     def run(self):
         while True:
@@ -182,6 +187,12 @@ oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$
                 self.last_mail = now
                 self.queue_mail(floor, ceiling, outdoor)
 
+            if (self.iteration > 1 and self.last_mail + 300 < now and (ceiling > CEILING_LIMIT_EMR or floor > FLOOR_LIMIT_EMR)):
+                self.last_mail = now
+                self.queue_mail(floor, ceiling, outdoor)
+                logger.debug("--------------EMERGENCY------------")
+
+
             sys.stdout.flush()
 
             wait = start + READINGINTERVAL - time.time()
@@ -203,10 +214,13 @@ class Mail0r(threading.Thread):
                 continue
 
             try:
-                s = smtplib.SMTP("localhost")
+                #s = smtplib.SMTP("localhost")
+                #we don't have a local mta anymore
+                s = smtplib.SMTP("mail.stusta.mhn.de")
                 s.sendmail(sender, recipient, msg)
                 s.quit()
             except Exception as e:
+                logger.debug("----ERROR---MAIL----")
                 logger.debug(e)
 
 
