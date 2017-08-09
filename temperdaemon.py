@@ -403,9 +403,6 @@ for busadress, descriptor in DEVICEMAPPING_USB.items():
 
     temperature_sensors_usb_by_name[descriptor[0]] = temperature_sensors[busadress]
 
-from pprint import pprint
-pprint(temperature_sensors_usb_by_name)
-
 for name, owid in DEVICEMAPPING_SERIAL:
     temperature_sensors[('serial', owid)] = TempSensorSerial(name, owid)
     
