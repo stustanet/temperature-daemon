@@ -1,0 +1,10 @@
+[Unit]
+Description=SSN temperature management service
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/temperature-deamon/temperdaemon.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

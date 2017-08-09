@@ -1,13 +1,20 @@
 #!/usr/bin/env python2.7
 # encoding: utf-8
 
+# Changelog
+# 
+# 200X Created
+# 2017 JW -- Gitted & Updated libtemperusb and changed the interfaces accordingly
+
+
 import os
 import sys
+sys.path.append("../temper")
 
 os.environ["USB_DEVFS_PATH"] = "/dev/bus/usb/temper"
 
 import socket
-import temper
+from temperusb import temper
 import threading
 import time
 import Queue
@@ -18,9 +25,9 @@ from collections import deque, namedtuple
 from email.mime.text import MIMEText
 from email.Utils import formatdate
 
-logging.basicConfig(format='%(asctime)s:%(name)s:%(levelname)s:%(message)s', level=logging.DEBUG)
+logging.basicConfig(format='%(asctime)s:%(name)s:%(levelname)s:%(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 READINGINTERVAL = 10
 
@@ -37,6 +44,28 @@ MAX_OUTDOOR_DIFF = 15
 
 MAILINTERVAL = 3600
 
+# Read the BUS and ADDRESS from a lsusb:
+#
+# $ lsusb
+# ...
+# Bus 005 Device 008: ID 0c45:7401 Microdia TEMPer Temperature Sensor
+# ...
+#
+# meaning: use the pair (5, 8) as bus, address tuple. 
+DEVICEMAPPING_USB = {
+        #(BUS, ADDRESS): (identifier, calibration)
+        (5, 8): ("floor", 5.00),
+        (5, 7): ("ceiling", 3.00),
+        (1, 4): ("outdoor", 3.30),
+}
+
+
+DEVICEMAPPING_SERIAL = [
+        ('floorserial', '10.C238A5010800'),
+        ('ceilserial', '10.0C33A5010800')
+]
+
+
 SPAM = False
 #SPAM = True
 
@@ -49,7 +78,7 @@ class TempReader(threading.Thread):
         self.iteration = 0
 
     def queue_mail(self, floor, ceiling, outdoor):
-        logger.debug("write mail ...")
+        logger.info("write mail ...")
 
         body = u'''DON'T PANIC!
 
@@ -70,9 +99,9 @@ oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$
   $$$$$$$$$$$$$$$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$$$$$$  """$$$
    "$$$""""$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     "$$$
     $$$   o$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     "$$$o
-   o$$"   $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$       $$$o
-   $$$    $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" "$$$$$$ooooo$$$$o
-  o$$$oooo$$$$$  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   o$$$$$$$$$$$$$$$$$
+   o$$"   $$$$$$$$$$$$$$$$$$$$$$$$S$$$$$$$$$$$$$$$$$$$$$$$$$$       $$$o
+   $$$    $$$$$$$$$$$$$$$$$$$$$$$$SS$$$$$$$$$$$$$$$$$$$" "$$$$$$ooooo$$$$o
+  o$$$oooo$$$$$  $$$$$$$$$$$$$$$$SSSS$$$$$$$$$$$$$$$$$   o$$$$$$$$$$$$$$$$$
   $$$$$$$$"$$$$   $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     $$$$""""""""
  """"       $$$$    "$$$$$$$$$$$$$$$$$$$$$$$$$$$$"      o$$$
             "$$$o     """$$$$$$$$$$$$$$$$$$"$$"         $$$
@@ -96,13 +125,14 @@ oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$
             msg['Subject'] = u"Temperaturalarm Serverraum"
         msg['From'] = src
         if SPAM:
-            dst = ["markus.hefele@stusta.net"]
+            dst = ["jw@stusta.net"]
         else:
             dst = ["admins@stustanet.de"]
         msg['To'] = ", ".join(dst)
         msg['Date'] = formatdate(localtime=True)
-
-        #self.mail_queue.put((src, dst, msg.as_string()))
+    
+        # Commented out for debugging reasons to not concern the admins
+        self.mail_queue.put((src, dst, msg.as_string()))
 
     def run(self):
         while True:
@@ -112,13 +142,14 @@ oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$
                 th = temper.TemperHandler()
 
                 # TODO naming things is hard!
-                for i, temp_device in th._devices.iteritems():
-
-                    temp_sensor = temperature_sensors.get(i)
+                for usb_device in th.get_devices():
+                    busadress = (usb_device._device.bus, usb_device._device.address)
+                    temp_sensor = temperature_sensors.get(busadress)
 
                     if temp_sensor:
                         try:
-                            temp_c = temp_device.get_temperature(calibration=temp_sensor.calibration)
+                            usb_device.set_calibration_data(scale=1, offset=temp_sensor.calibration)
+                            temp_c = usb_device.get_temperature()
                             record = temp_sensor.update(temp_c)
                             self.export_queue.put(record)
                         except Exception as e:
@@ -190,7 +221,7 @@ oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$
             if (self.iteration > 1 and self.last_mail + 300 < now and (ceiling > CEILING_LIMIT_EMR or floor > FLOOR_LIMIT_EMR)):
                 self.last_mail = now
                 self.queue_mail(floor, ceiling, outdoor)
-                logger.debug("--------------EMERGENCY------------")
+                logger.info("--------------EMERGENCY------------")
 
 
             sys.stdout.flush()
@@ -220,8 +251,8 @@ class Mail0r(threading.Thread):
                 s.sendmail(sender, recipient, msg)
                 s.quit()
             except Exception as e:
-                logger.debug("----ERROR---MAIL----")
-                logger.debug(e)
+                logger.error("----ERROR---MAIL----")
+                logger.error(e)
 
 
 CollectdRecord = namedtuple("CollectdRecord", ["hostname", "path", "interval", "epoch", "value"])
@@ -251,7 +282,7 @@ class Exp0rt0r(threading.Thread):
                     s.setblocking(False)
                     self.socket = s
                 except Exception as e:
-                    logger.debug(e)
+                    logger.error(e)
                     time.sleep(1)
                     continue
 
@@ -312,7 +343,7 @@ class TempSensor(object):
             self.temperature = temperature
             self.last_updated = now
 
-            logger.debug("update %s", self)
+            logger.info("update %s", self)
 
             return CollectdRecord(HOSTNAME, self._path, int(self._interval),
                     int(self.last_updated), "%f" % (self.temperature,))
@@ -363,15 +394,23 @@ temperature_sensors = {}
 temperature_sensors_usb_by_name = {}
 temperature_sensors_serial_by_name = {}
 
-for name, calibration, bus, device in [('floor', 500, '001', '001'), ('ceiling', 300, '002', '001'), ('outdoor', 330, '003', '001')]:
-    temperature_sensors[(bus, device)] = TempSensorUSB(name, calibration, bus, device)
+for busadress, descriptor in DEVICEMAPPING_USB.items():
+    temperature_sensors[busadress] = TempSensorUSB(
+            descriptor[0], 
+            descriptor[1], 
+            busadress[0],
+            busadress[1])
 
-    temperature_sensors_usb_by_name[name] = temperature_sensors[(bus, device)]
+    temperature_sensors_usb_by_name[descriptor[0]] = temperature_sensors[busadress]
 
-for name, owid in [('floorserial', '10.C238A5010800'), ('ceilserial', '10.0C33A5010800')]:
+from pprint import pprint
+pprint(temperature_sensors_usb_by_name)
+
+for name, owid in DEVICEMAPPING_SERIAL:
     temperature_sensors[('serial', owid)] = TempSensorSerial(name, owid)
-
+    
     temperature_sensors_serial_by_name[name] = temperature_sensors[('serial', owid)]
+
 
 if __name__ == "__main__":
     mail_queue = Queue.Queue()
