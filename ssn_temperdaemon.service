@@ -3,7 +3,8 @@ Description=SSN temperature management service
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/temperature-deamon/temperdaemon.py
+WorkingDirectory=/usr/local/bin/temperature-daemon/
+ExecStart=/usr/local/bin/temperature-daemon/temperdaemon.py
 Restart=on-failure
 
 [Install]
