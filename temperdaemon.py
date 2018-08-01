@@ -38,8 +38,8 @@ HOSTNAME = "hugin.stusta.mhn.de"
 
 FLOOR_LIMIT = 25
 CEILING_LIMIT = 30
-CEILING_LIMIT_EMR = 42
-FLOOR_LIMIT_EMR = 40
+CEILING_LIMIT_EMR = 45
+FLOOR_LIMIT_EMR = 45
 MAX_OUTDOOR_DIFF = 15
 
 MAILINTERVAL = 3600
@@ -119,15 +119,18 @@ oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$
 
         msg = MIMEText(body.format(floor, ceiling, outdoor),  _charset="UTF-8")
         src = "Temperator <root@hugin.stusta.mhn.de>"
+        # Normally, only send to Vorstand
+        dst = ["vorstand@stustanet.de"]
         if (ceiling>CEILING_LIMIT_EMR)or(floor>FLOOR_LIMIT_EMR):
             msg['Subject'] = u"TEMPERATURNOTFALL Serverraum!"
+            # Send emergency to everyone
+            dst = ["admins@stustanet.de"]
         else:
             msg['Subject'] = u"Temperaturalarm Serverraum"
         msg['From'] = src
         if SPAM:
+            # Send only to jw
             dst = ["jw@stusta.net"]
-        else:
-            dst = ["admins@stustanet.de"]
         msg['To'] = ", ".join(dst)
         msg['Date'] = formatdate(localtime=True)
     
