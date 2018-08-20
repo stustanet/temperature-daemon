@@ -1,0 +1,11 @@
+[Unit]
+Description=SSN temperature monitoring service
+After=network.target
+
+[Service]
+WorkingDirectory=/usr/local/bin/temperature-daemonv2/
+ExecStart=/usr/local/bin/temperature-daemonv2/tempermonitor.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
