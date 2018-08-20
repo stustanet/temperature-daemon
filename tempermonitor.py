@@ -1,39 +1,82 @@
 #!/usr/bin/env python3
 
+"""
+This is the tempermonitoring system v2.
+
+it is based on the work of the old temperature monitoring system and released
+under the terms as stated in the LICENSE.md file.
+
+Changelog:
+
+2018-08 jotweh: reimplemented using a micropython-esp32
+
+Open issues:
+
+- Temperature Limits
+- Integrate USB Sensors
+"""
+
+
 import asyncio
 import configparser
+import sys
 import time
 from datetime import datetime
-
 from email.mime.text import MIMEText
 from email.utils import formatdate
-
 import smtplib
-
 import serial_asyncio
 
-UNKNOWN_SENSOR_HEADER = "WARNING: Unknown Sensor ID"
+UNKNOWN_SENSOR_SUBJECT = "WARNING: Unconfigured Sensor ID"
 UNKNOWN_SENSOR_BODY = """Hello Guys,
 
-An unknown Sensor has been connected to the Temperature monitoring service.
-Please add the sensor to the list of known sensors: {config}.
+An unknown sensor has been connected to the temperature monitoring service.
+Please add the following section to the list of known sensors in {config}.
 
-The SensorID is {owid}
-Its current Temperature is {temp}
+[{owid}]
+name=changeme
+calibration=0
 
-Regards, Temperature"""
+The current temperature of the sensor is {temp}
 
-SENSOR_MEASUREMENT_MISSED = "WARNING: Sensor Measurement was missed"
-SENSOR_MEASUREMENT_MISSED = """Hello Guys,
+Regards, Temperature
+"""
 
-A Sensor measurement was missed from the temperature monitoring.
+SENSOR_MEASUREMENT_MISSED_SUBJECT = "WARNING: Sensor Measurement was missed"
+SENSOR_MEASUREMENT_MISSED_BODY = """Hello Guys,
 
-The sensor in question is {owid}, named {name}.
+A sensor measurement was missed from the temperature monitoring.
+This indicates either a problem with the hardware (check the wireing!) or the config.
+
+ID: {owid}
+NAME: {name}.
 
 Please go check it!
 
-Regards, Temperature"""
+Regards, Temperature
+"""
 
+SENSOR_PROBLEM_SUBJECT = "WARNING: Sensor error"
+SENSOR_PROBLEM_BODY = """Hello Guys,
+
+A sensor measurement was invalid. This might mean, that the sensor was disconnected.
+Please go and check the sensor with the id
+
+ID: {owid}
+NAME: {name}.
+LAST: {tem}
+
+Regards, Temperature
+"""
+
+NO_DATA_SUBJECT = "WARNING: Did not receive any data"
+NO_DATA_BODY = """Helly guys,
+
+It has been {time} seconds since i have last received a temperature value.
+This is unlikely - please come and check
+
+Regards, Temperature
+"""
 
 class Sensor:
     """
@@ -48,8 +91,10 @@ class Sensor:
             if owid in config:
                 self.name = config[owid]['name']
                 self.calibration = config[owid]['calibration']
+            else:
+                print("Invalid Config: missing section {}".format(owid))
         except KeyError as exc:
-            print("Invalid Config: ", exc)
+            print("Invalid Config: for {}: {}".format(owid, exc))
             raise
 
     def update(self, temperature):
@@ -60,15 +105,28 @@ class Sensor:
         self.last_update = time.time()
 
 class Collectd:
+    """
+    Implements a super simple collectd interface for only sending temperature data
+    """
     def __init__(self, loop, config):
         self.loop = loop or asyncio.get_event_loop()
         self.config = config
+        self.path = self.config['collectd']['socketpath']
+        self._reader, self._writer = (None, None)
+        self.loop.run_until_complete(self.reconnect())
 
-        self._reader, self._writer = self.loop.run_until_complete(
-            asyncio.open_unix_connection(
-                path=self.config['collectd']['socketpath'],
-                loop=self.loop
-            ))
+    async def reconnect(self):
+        """
+        optionally close and then reconnect to the unix socket
+        """
+        if self._reader:
+            self._reader.close()
+        if self._writer:
+            self._writer.close()
+
+        self._reader, self._writer = await asyncio.open_unix_connection(
+            path=self.path,
+            loop=self.loop)
 
     async def send(self, sensor):
         """
@@ -76,12 +134,21 @@ class Collectd:
         """
         data = "PUTVAL \"{}/{}\" interval={} {}:{}\n".format(
             self.config['collectd']['hostname'],
-            sensor.name,
+            "tail-temperature/temperature-{}".format(sensor.name),
             int(self.config['collectd']['interval']),
             int(sensor.last_update),
             sensor.temperature)
-        self._writer.write(data)
+        print("Sending data:", data.strip())
+        self._writer.write(data.encode('utf-8'))
         await self._writer.drain()
+        line = (await self._reader.readline()).decode('utf-8').strip()
+        if not line:
+            print("Connection reset. reconnecting")
+            await self.reconnect()
+        else:
+            print("recv:", line)
+
+
 
 class TempMonitor:
     """
@@ -95,36 +162,42 @@ class TempMonitor:
     """
 
     def __init__(self, loop, configfile):
-        self.loop = loop or asyncio.get_event_loop()
+        loop = loop or asyncio.get_event_loop()
 
         self._configname = configfile
         self.config = configparser.ConfigParser()
         self.config.read(configfile)
 
-        self._collectd = Collectd(self.loop, self.config)
-
-        self._reader, self._writer = self.loop.run_until_complete(
+        self._collectd = Collectd(loop, self.config)
+        print("connecting to", self.config['serial']['port'])
+        self._reader, self._writer = loop.run_until_complete(
             serial_asyncio.open_serial_connection(
                 url=self.config['serial']['port'],
                 baudrate=self.config['serial']['baudrate'],
-                loop=self.loop
+                loop=loop
             ))
 
         self._known_sensors = {}
         self._last_store = 0
 
-        # Test if all necessary config fields, that are not part of the normal
+        self._mail_rate_limit = {}
+
+        # Test if all necessary config fields are set, that are not part of the normal
         # startup
         configtest = [
+            self.config['collectd']['hostname'],
+            self.config['collectd']['interval'],
             self.config['mail']['from'],
             self.config['mail']['to'],
             self.config['mail']['to_urgent'],
+            self.config['mail']['min_delay_between_messages'],
+            self.config['serial']['timeout'],
         ]
         del configtest
 
-        predefined_sections = ['serial', 'collectd', 'mail']
         for owid in self.config:
-            if owid in predefined_sections:
+            # Skip all known and predefined sections
+            if owid in ['DEFAULT', 'serial', 'collectd', 'mail']:
                 continue
             self._known_sensors[owid] = Sensor(self.config, owid)
 
@@ -134,45 +207,66 @@ class TempMonitor:
         """
         Read the protocol, update the sensors or trigger a collectd update
         """
-        # This is just a hack to drop the micropython startup
-        # The parameter has to be tuned
-        await asyncio.sleep(0.1)
-        self._reader.drain()
-        firstrun = True
+        # upon startup we only see garbage. (micropython starting up),
+        # also it will produce warnings if the recording is started in the middle
+        # of a message, so wait until the end of a message block to start the game
+        # If the baudrate is wrong during micropython startup - this will also be
+        # skiped.
+        while True:
+            try:
+                if await self._reader.readline().decode('ascii').strip() == "":
+                    break
+            except UnicodeError:
+                continue
 
         while True:
-            line = self._reader.readline()
+            # Wait for the next line
+            try:
+                line = await asyncio.wait_for(
+                    self._reader.readline(),
+                    timeout=self.config['serial']['timeout'])
+            except asyncio.TimeoutError:
+                await self.send_mail(NO_DATA_SUBJECT, NO_DATA_BODY)
+                continue
+
             try:
                 line = line.decode('ascii')
             except UnicodeError:
                 continue
+            print("recv:", line)
 
             if line == '':
                 # Block has ended
                 await self.store_sensors()
-                firstrun = False
-            elif firstrun:
-                # We start recording after we have seen the first empty line
-                # else our first package might be incomplete
-                pass
+                continue
+            # Try to parse the line
+            try:
+                owid, temp = line.split(' ')
+            except ValueError as exc:
+                print("Invaid line received: {}\n{}".format(line, exc))
+                continue
+
+            sensor = self._known_sensors.get(owid, None)
+            if not sensor:
+                # If the sensor is new - notify the operators
+                await self.send_mail(
+                    UNKNOWN_SENSOR_SUBJECT,
+                    UNKNOWN_SENSOR_BODY.format(
+                        configname=self._configname,
+                        owid=owid,
+                        temp=temp))
+
+            elif temp > 1000 or temp < -1000:
+                # if the sensor is giving bullshit data - notify the operators
+                await self.send_mail(
+                    SENSOR_PROBLEM_SUBJECT,
+                    SENSOR_PROBLEM_BODY.format(
+                        owid=owid,
+                        name=sensor.name,
+                        temp=temp))
             else:
-                try:
-                    owid, temp = line.split(' ')
-                except ValueError as exc:
-                    # TODO upon startup we only see garbage. (micropython starting up)
-                    # maybe there is an efficient way of dropping those?
-                    # like waiting for ~10 seconds in the beginning?
-                    print("Invaid line received: {}\n{}".format(line, exc))
-                    continue
-                if owid not in self._known_sensors:
-                    await self.send_mail(
-                        UNKNOWN_SENSOR_HEADER,
-                        UNKNOWN_SENSOR_BODY.format(
-                            configparser=self._configname,
-                            owid=owid,
-                            temp=temp))
-                else:
-                    self._known_sensors[owid].update(temp)
+                # in the unlikely event that everyting is fine: log the data
+                sensor.update(temp)
 
     async def teardown(self):
         """ Terminate all started tasks """
@@ -187,12 +281,13 @@ class TempMonitor:
         Prepare the sensors to be stored and maybe send an email
         """
         for owid, sensor in self._known_sensors.items():
-            if sensor.last_update < self._last_store:
+            if sensor.last_update <= self._last_store:
                 isotime = datetime.utcfromtimestamp(sensor.last_update).isoformat()
-                self.send_mail(
-                    SENSOR_MEASUREMENT_MISSED,
-                    SENSOR_MEASUREMENT_MISSED.format(
+                await self.send_mail(
+                    SENSOR_MEASUREMENT_MISSED_SUBJECT,
+                    SENSOR_MEASUREMENT_MISSED_BODY.format(
                         owid=owid,
+                        name=sensor.name,
                         last_update=isotime))
             else:
                 await self._collectd.send(sensor)
@@ -203,6 +298,7 @@ class TempMonitor:
         """
         Send a mail to the configured recipients
         """
+
         msg = MIMEText(body, _charset="UTF-8")
         msg['Subject'] = subject
         msg['From'] = self.config['mail']['from']
@@ -213,7 +309,14 @@ class TempMonitor:
 
         msg['Date'] = formatdate(localtime=True)
 
-        # Commented out for debugging reasons to not concern the admins
+        print("Problem {}\n\n{}\n".format(subject, body))
+
+        # Ratelimit the emails
+        time_since_last_mail = time.time() - self._mail_rate_limit.get(subject, 0)
+        if time_since_last_mail < self.config['mail']['min_delay_between_messages']:
+            return
+
+        self._mail_rate_limit[subject] = time.time()
         smtp = smtplib.SMTP("mail.stusta.mhn.de")
         smtp.sendmail(msg['From'], msg['To'], msg.as_string())
         smtp.quit()
@@ -223,9 +326,19 @@ def main():
     Start the tempmonitor
     """
     loop = asyncio.get_event_loop()
-    monitor = TempMonitor(loop, "./tempermon.ini")
-    loop.run_forever()
-    loop.run_until_complete(monitor.teardown())
 
-if __name__ == "__init__":
+    configfile = "/etc/temperature/tempermon.ini"
+    if len(sys.argv) == 2:
+        configfile = sys.argv[1]
+
+    print("Configuring temperature monitoring system from {}.".format(configfile))
+    monitor = TempMonitor(loop, configfile)
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.run_until_complete(monitor.teardown())
+
+if __name__ == "__main__":
     main()
