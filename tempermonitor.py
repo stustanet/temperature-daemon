@@ -224,7 +224,7 @@ class TempMonitor:
             try:
                 line = await asyncio.wait_for(
                     self._reader.readline(),
-                    timeout=self.config['serial']['timeout'])
+                    timeout=int(self.config['serial']['timeout']))
             except asyncio.TimeoutError:
                 await self.send_mail(NO_DATA_SUBJECT, NO_DATA_BODY)
                 continue
