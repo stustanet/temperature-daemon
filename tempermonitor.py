@@ -101,7 +101,7 @@ class Sensor:
         """
         Store a new measurement, and remember the time it was taken
         """
-        self.temperature = temperature
+        self.temperature = float(temperature)
         self.last_update = time.time()
 
 class Collectd:
@@ -214,7 +214,7 @@ class TempMonitor:
         # skiped.
         while True:
             try:
-                if await self._reader.readline().decode('ascii').strip() == "":
+                if (await self._reader.readline()).decode('ascii').strip() == "":
                     break
             except UnicodeError:
                 continue
@@ -230,7 +230,7 @@ class TempMonitor:
                 continue
 
             try:
-                line = line.decode('ascii')
+                line = line.decode('ascii').strip()
             except UnicodeError:
                 continue
             print("recv:", line)
@@ -242,6 +242,7 @@ class TempMonitor:
             # Try to parse the line
             try:
                 owid, temp = line.split(' ')
+                temp = float(temp)
             except ValueError as exc:
                 print("Invaid line received: {}\n{}".format(line, exc))
                 continue
@@ -298,7 +299,6 @@ class TempMonitor:
         """
         Send a mail to the configured recipients
         """
-
         msg = MIMEText(body, _charset="UTF-8")
         msg['Subject'] = subject
         msg['From'] = self.config['mail']['from']
@@ -306,7 +306,6 @@ class TempMonitor:
             msg['To'] = self.config['mail']['to_urgent']
         else:
             msg['To'] = self.config['mail']['to']
-
         msg['Date'] = formatdate(localtime=True)
 
         print("Problem {}\n\n{}\n".format(subject, body))
