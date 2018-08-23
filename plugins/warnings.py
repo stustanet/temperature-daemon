@@ -46,13 +46,13 @@ class PluginWarning:
         avg = sum(sensor.temperature for sensor in sensors) / len(sensors)
         var = sum((sensor.temperature - avg)**2 for sensor in sensors) / len(sensors)
 
-        sensormin = -9999
-        sensormax = +9999
+        sensormin = +9999
+        sensormax = -9999
         for sensor in sensors:
             if sensor.temperature < sensormin:
-                sensormin = sensormin
+                sensormin = sensor.temperature
             if sensor.temperature > sensormax:
-                sensormax = sensormax
+                sensormax = sensor.temperature
 
         return sensors, sensormin, sensormax, avg, var
 
@@ -106,6 +106,11 @@ class PluginWarning:
             await self.monitor.call_plugin(
                 "send_stats_graph", graph="stats",
                 stattype="temperature-floor_ceil_diff", stattime=now, statval=tempdiff)
+
+            print("floor: min {:05.2f} max {:05.2f} avg {:05.2f} var {:05.2f}".format(
+                    floor_min, floor_max, floor_avg, floor_var))
+            print("ceil:  min {:05.2f} max {:05.2f} avg {:05.2f} var {:05.2f}".format(
+                    ceil_min, ceil_max, ceil_avg, ceil_var))
 
             # Here comes the warning magic
             if ceil_max > int(self.warning_conf['min_ceiling_warning']):

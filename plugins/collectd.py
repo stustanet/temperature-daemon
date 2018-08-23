@@ -81,7 +81,7 @@ class PluginCollectd:
         """
         await self._send("tail-{}/{}".format(graph, stattype),
                          int(self.config['collectd']['interval']),
-                         stattime,
+                         int(stattime),
                          statval)
 
     async def sensor_update(self):
