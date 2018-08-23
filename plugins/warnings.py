@@ -108,23 +108,23 @@ class PluginWarning:
                 stattype="temperature-floor_ceil_diff", stattime=now, statval=tempdiff)
 
             print("floor: min {:05.2f} max {:05.2f} avg {:05.2f} var {:05.2f}".format(
-                    floor_min, floor_max, floor_avg, floor_var))
+                floor_min, floor_max, floor_avg, floor_var))
             print("ceil:  min {:05.2f} max {:05.2f} avg {:05.2f} var {:05.2f}".format(
-                    ceil_min, ceil_max, ceil_avg, ceil_var))
+                ceil_min, ceil_max, ceil_avg, ceil_var))
 
             # Here comes the warning magic
             if ceil_max > int(self.warning_conf['min_ceiling_warning']):
                 if  tempdiff > int(self.warning_conf['floor_ceiling_diff']):
                     await self.monitor.call_plugin("temperature_warning",
-                                                source="tempdiff",
-                                                name1="floor",
-                                                name2="ceiling",
-                                                temp1=floor_avg,
-                                                temp2=ceil_avg,
-                                                tempdiff=tempdiff)
+                                                   source="tempdiff",
+                                                   name1="floor",
+                                                   name2="ceiling",
+                                                   temp1=floor_avg,
+                                                   temp2=ceil_avg,
+                                                   tempdiff=tempdiff)
 
             if ceil_avg > int(self.warning_conf['ceiling_warning_level']):
                 await self.monitor.call_plugin("temperature_warning",
-                                            source="singlehot",
-                                            name="ceiling",
-                                            temp=ceil_avg)
+                                               source="singlehot",
+                                               name="ceiling",
+                                               temp=ceil_avg)

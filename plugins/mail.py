@@ -142,7 +142,7 @@ Temperator"""
             temperatures = "{name1}:{temp1}\n{name2}:{temp2}".format(**kwargs)
             reason = "Differenztemperatur: {tempdiff}".format(**kwargs)
         elif source == "singlehot":
-            temperatures="{name}:{temp}".format(**kwargs)
+            temperatures = "{name}:{temp}".format(**kwargs)
             reason = "Einzeltemperatur zu hoch"
 
         alltemperatures = '\n'.join([
