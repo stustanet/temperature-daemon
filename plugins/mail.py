@@ -3,7 +3,7 @@ from email.mime.text import MIMEText
 from email.utils import formatdate
 import smtplib
 
-UNKNOWN_SENSOR_SUBJECT = "WARNING: Unconfigured Sensor ID"
+UNKNOWN_SENSOR_SUBJECT = "WARNING: Unconfigured Sensor ID: {owid}"
 UNKNOWN_SENSOR_BODY = """Hello Guys,
 
 An unknown sensor has been connected to the temperature monitoring service.
@@ -54,6 +54,20 @@ This is unlikely - please come and check
 Regards, Temperature
 """
 
+NO_VALID_DATA_SUBJECT = "WARNING: Garbage data"
+NO_VALID_DATA_BODY = """Helly guys,
+
+We have data on the line - but it fails even the most simple verification.
+
+The last received line was:
+
+{last_line}
+
+please check if the controller is going haywire.
+
+Regards, Temperature
+"""
+
 
 
 def init(monitor):
@@ -80,9 +94,10 @@ class PluginMail:
         msg['Subject'] = subject
         msg['From'] = self.config['mail']['from']
         if urgent:
-            msg['To'] = self.config['mail']['to_urgent']
+            recipients = self.config['mail']['to_urgent'].split(',')
         else:
-            msg['To'] = self.config['mail']['to']
+            recipients = self.config['mail']['to'].split(',')
+        msg['To'] = ",".join([s.strip() for s in recipients])
         msg['Date'] = formatdate(localtime=True)
 
         print("Notification: {}".format(subject))
@@ -97,15 +112,18 @@ class PluginMail:
 
         self._mail_rate_limit[subject] = time.time()
         smtp = smtplib.SMTP("mail.stusta.mhn.de")
-        #smtp.sendmail(msg['From'], msg['To'], msg.as_string())
+        #smtp.sendmail(msg['From'], recipients, msg.as_string())
         smtp.quit()
 
     async def err_nodata(self, **kwargs):
         await self.send_mail(NO_DATA_SUBJECT, NO_DATA_BODY)
 
+    async def err_no_valid_data(self, **lwargs):
+        await self.send_mail(NO_VALID_DATA_SUBJECT, NO_VALID_DATA_BODY)
+
     async def err_unknown_sensor(self, **kwargs):
         await self.send_mail(
-            UNKNOWN_SENSOR_SUBJECT,
+            UNKNOWN_SENSOR_SUBJECT.format(**kwargs),
             UNKNOWN_SENSOR_BODY.format(**kwargs))
 
     async def err_problem_sensor(self, **kwargs):

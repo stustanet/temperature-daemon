@@ -34,7 +34,7 @@ class Sensor:
         self.temperature = None
         self.last_update = 0
         self.calibration = 0
-        self.valid = False
+        self.valid = True
 
         try:
             if owid in config:
@@ -125,9 +125,14 @@ class TempMonitor:
         Read the protocol, update the sensors or trigger a collectd update
         """
         await self.reconnect()
-
+        last_valid_data_received = time.time()
+        line = ""
         while True:
             # Wait for the next line
+
+            if time.time() - last_valid_data_received > 1800:
+                self.call_plugin("err_no_valid_data", last_line=line)
+
             try:
                 line = await asyncio.wait_for(
                     self._reader.readline(),
@@ -146,6 +151,7 @@ class TempMonitor:
                 continue
             #print("recv:", line)
 
+
             if line == '':
                 # Block has ended
                 await self.store_sensors()
@@ -157,6 +163,9 @@ class TempMonitor:
             except ValueError as exc:
                 print("Invaid line received: {}\n{}".format(line, exc))
                 continue
+
+            ## we have at least a valid line
+            last_valid_data_received = time.time()
 
             sensor = self.sensors.get(owid, None)
             if not sensor:
