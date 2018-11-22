@@ -112,7 +112,25 @@ class PluginWarning:
             print("ceil:  min {:05.2f} max {:05.2f} avg {:05.2f} var {:05.2f}".format(
                 ceil_min, ceil_max, ceil_avg, ceil_var))
 
+
             # Here comes the warning magic
+
+            # Critical: ceiling temperature > threshold (sane default: 45)
+            if ceil_max > int(self.warning_conf['ceiling_critical_level']):
+                await self.monitor.call_plugin("temperature_warning",
+                                               source="singlehot",
+                                               name="ceiling",
+                                               temp=ceil_max,
+                                               urgent=True)
+
+            # Warning: ceiling tempareture > threshold (sane default: 40)
+            if ceil_avg > int(self.warning_conf['ceiling_warning_level']):
+                await self.monitor.call_plugin("temperature_warning",
+                                               source="singlehot",
+                                               name="ceiling",
+                                               temp=ceil_avg)
+
+            # Warning: temperature difference > threshold (sane default: 17)
             if ceil_max > int(self.warning_conf['min_ceiling_warning']):
                 if  tempdiff > int(self.warning_conf['floor_ceiling_diff']):
                     await self.monitor.call_plugin("temperature_warning",
@@ -123,8 +141,3 @@ class PluginWarning:
                                                    temp2=ceil_avg,
                                                    tempdiff=tempdiff)
 
-            if ceil_avg > int(self.warning_conf['ceiling_warning_level']):
-                await self.monitor.call_plugin("temperature_warning",
-                                               source="singlehot",
-                                               name="ceiling",
-                                               temp=ceil_avg)

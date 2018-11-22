@@ -65,6 +65,9 @@ The last received line was:
 
 please check if the controller is going haywire.
 
+I will try to fix this issue by reconnecting...
+
+
 Regards, Temperature
 """
 
@@ -116,10 +119,14 @@ class PluginMail:
         smtp.quit()
 
     async def err_nodata(self, **kwargs):
-        await self.send_mail(NO_DATA_SUBJECT, NO_DATA_BODY)
+        await self.send_mail(
+            NO_DATA_SUBJECT.format(**kwargs),
+            NO_DATA_BODY.format(**kwargs))
 
-    async def err_no_valid_data(self, **lwargs):
-        await self.send_mail(NO_VALID_DATA_SUBJECT, NO_VALID_DATA_BODY)
+    async def err_no_valid_data(self, **kwargs):
+        await self.send_mail(
+            NO_VALID_DATA_SUBJECT.format(**kwargs),
+            NO_VALID_DATA_BODY.format(**kwargs))
 
     async def err_unknown_sensor(self, **kwargs):
         await self.send_mail(
@@ -137,7 +144,7 @@ class PluginMail:
             SENSOR_MEASUREMENT_MISSED_BODY.format(**kwargs))
 
 
-    async def temperature_warning(self, source, **kwargs):
+    async def temperature_warning(self, source, urgent=False, **kwargs):
         subject = "Temperaturwarnung Serverraum"
 
         body = """Hi Guys,
@@ -169,4 +176,5 @@ Temperator"""
             for sensor in self.monitor.sensors.values() ])
 
         await self.send_mail(subject, body.format(
-            temperatures=temperatures, reason=reason, alltemperatures=alltemperatures))
+            temperatures=temperatures, reason=reason, alltemperatures=alltemperatures),
+            urgent=urgent)
