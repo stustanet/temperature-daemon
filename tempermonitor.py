@@ -174,7 +174,7 @@ class TempMonitor:
                                        config=self._configname,
                                        owid=owid,
                                        temp=temp)
-            elif temp > 1000 or temp < -1000:
+            elif temp > 9000 or temp < -1000:
                 sensor.valid = False
                 # if the sensor is giving bullshit data - notify the operators
                 await self.call_plugin("err_problem_sensor",
