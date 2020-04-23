@@ -85,6 +85,7 @@ class TempMonitor:
         # Test if all necessary config fields are set, that are not part of the normal
         # startup
         configtest = [
+            self.config['general']['plugins'],
             self.config['collectd']['hostname'],
             self.config['collectd']['interval'],
             self.config['mail']['from'],
@@ -100,7 +101,7 @@ class TempMonitor:
         print("connecting to", self.config['serial']['port'])
         for owid in self.config:
             # Skip all known and predefined sections
-            if owid in ['DEFAULT', 'serial', 'collectd', 'mail', 'warning']:
+            if owid in ['DEFAULT', 'serial', 'collectd', 'mail', 'warning', 'prometheus', 'general']:
                 continue
             self.sensors[owid] = Sensor(self.config, owid)
         self._run_task = loop.create_task(self.run())
