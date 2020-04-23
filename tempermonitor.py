@@ -43,7 +43,7 @@ class Sensor:
             print(f"Invalid Config: missing section {owid}")
             return
 
-        if 'name' not in config[owid] and 'calibration' not in config[owid]:
+        if 'name' not in config[owid] or 'calibration' not in config[owid]:
             print(f"Invalid Config for: {owid}")
             raise RuntimeError(f"Invalid Config for: {owid}")
 
