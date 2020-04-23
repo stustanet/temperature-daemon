@@ -27,11 +27,11 @@ build_buster:
     - apt install -y python3-stdeb python-all
     - dpkg-buildpackage -us -uc
     - mkdir -p build/
-    - mv ../tempermonitor*.deb build/
-    - mv ../tempermonitor*.changes build/
-    - mv ../tempermonitor*.tar.gz build/
-    - mv ../tempermonitor*.dsc build/
-    - mv ../tempermonitor*.buildinfo build/
+    - mv ../*tempermonitor*.deb build/
+    - mv ../*tempermonitor*.changes build/
+    - mv ../*tempermonitor*.tar.gz build/
+    - mv ../*tempermonitor*.dsc build/
+    - mv ../*tempermonitor*.buildinfo build/
 
   # The files which are to be made available in GitLab
   artifacts:
