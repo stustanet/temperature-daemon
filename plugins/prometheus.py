@@ -28,7 +28,7 @@ class PluginPrometheus:
 
         start_http_server(
             addr=self.config["prometheus"].get('address', 'localhost'),
-            port=self.config["prometheus"]["port"]
+            port=int(self.config["prometheus"]["port"])
         )
 
     async def update_sensor_values(self, sensor):

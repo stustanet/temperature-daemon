@@ -262,7 +262,7 @@ def main():
     print(f"Active plugins: {active_plugins}")
 
     for filename in plugin_path.glob("*.py"):
-        if (plugin_path / filename).exists() and filename.name in active_plugins:
+        if (plugin_path / filename).exists() and filename.stem in active_plugins:
             print("loading {}".format(filename.name))
             modname = "plugins." + filename.name.split('.')[0]
             module = importlib.import_module(modname)
