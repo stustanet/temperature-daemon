@@ -51,9 +51,13 @@ class PluginCollectd:
             interval,
             timestamp,
             value)
-        # print("Sending data:", data.strip())
-        self._writer.write(data.encode('utf-8'))
-        await self._writer.drain()
+        try:
+            #print("Sending data:", data.strip())
+            self._writer.write(data.encode('utf-8'))
+            await self._writer.drain()
+        except:
+            await self.reconnect()
+            return
 
         try:
             line = await asyncio.wait_for(self._reader.readline(), 1)
