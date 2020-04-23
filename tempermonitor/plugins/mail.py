@@ -3,6 +3,8 @@ from email.mime.text import MIMEText
 from email.utils import formatdate
 import smtplib
 
+from . import Plugin
+
 UNKNOWN_SENSOR_SUBJECT = "WARNING: Unconfigured Sensor ID: {owid}"
 UNKNOWN_SENSOR_BODY = """Hello Guys,
 
@@ -89,14 +91,7 @@ with love,
 Temperator"""
 
 
-def init(monitor):
-    """
-    Plugin initialization method to be called from the outside
-    """
-    return PluginMail(monitor)
-
-
-class PluginMail:
+class Mail(Plugin):
     """
     Handle all the mail sending stuff
     """

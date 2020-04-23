@@ -27,6 +27,8 @@ from pathlib import Path
 import serial_asyncio
 import serial
 
+from tempermonitor.plugins import PLUGINS
+
 
 class Sensor:
     """
@@ -254,14 +256,6 @@ class TempMonitor:
         self._last_store = time.time()
 
 
-def setup_plugin(filename, plugin):
-    """
-    Setup and fix plugins
-    """
-    if not getattr(plugin, "name", None):
-        plugin.name = filename
-
-
 def main():
     """
     Start the tempmonitor
@@ -272,23 +266,17 @@ def main():
     if len(sys.argv) == 2:
         configfile = sys.argv[1]
 
-    print("Configuring temperature monitoring system from {}.".format(configfile))
+    print(f"Configuring temperature monitoring system from {configfile}.")
     monitor = TempMonitor(loop, configfile)
 
-    plugin_path = Path(__file__).resolve().parent / "plugins"
-    print("Loading plugins from {}".format(plugin_path))
     active_plugins = monitor.config["general"]["plugins"].split(",")
     print(f"Active plugins: {active_plugins}")
 
-    for filename in plugin_path.glob("*.py"):
-        if (plugin_path / filename).exists() and filename.stem in active_plugins:
-            print("loading {}".format(filename.name))
-            modname = "plugins." + filename.name.split('.')[0]
-            module = importlib.import_module(modname)
-            plugin = module.init(monitor)
-            setup_plugin(filename, plugin)
-            monitor.plugins.append(plugin)
-            print("Loaded: {}".format(plugin.name))
+    for plugin in active_plugins:
+        if plugin in PLUGINS:
+            p = PLUGINS[plugin](monitor)
+            monitor.plugins.append(p)
+            print(f"Loaded plugin: {plugin}")
 
     try:
         loop.run_forever()

@@ -1,3 +1,9 @@
+tempermonitor (2.0.4) buster; urgency=medium
+
+  * improve plugin handling
+
+ -- Michael Loipführer <ml@stusta.de>  Thu, 23 Apr 2020 23:30:18 +0200
+
 tempermonitor (2.0.3) buster; urgency=medium
 
   * rename config file

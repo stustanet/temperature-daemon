@@ -1,12 +1,9 @@
 import time
 
-
-def init(monitor):
-    """ Plugin interface method """
-    return PluginWarning(monitor)
+from . import Plugin
 
 
-class PluginWarning:
+class Warnings(Plugin):
     """
     Generate all kind of warnings whenever needed and observe the sensor
     if they see a problematic situation in the container

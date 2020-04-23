@@ -1,12 +1,10 @@
 import asyncio
 import time
 
-
-def init(monitor):
-    return PluginCollectd(monitor)
+from . import Plugin
 
 
-class PluginCollectd:
+class Collectd(Plugin):
     """
     Implements a super simple collectd interface for only sending temperature data
     """

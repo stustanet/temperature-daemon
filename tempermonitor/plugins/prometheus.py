@@ -1,13 +1,10 @@
 import asyncio
-
 from prometheus_client import start_http_server, Gauge
 
-
-def init(monitor):
-    return PluginPrometheus(monitor)
+from . import Plugin
 
 
-class PluginPrometheus:
+class Prometheus(Plugin):
     def __init__(self, monitor):
         self.loop = asyncio.get_event_loop()
         self.config = monitor.config
