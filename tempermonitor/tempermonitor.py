@@ -297,6 +297,3 @@ def main():
     finally:
         loop.run_until_complete(monitor.teardown())
 
-
-if __name__ == "__main__":
-    main()

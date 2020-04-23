@@ -1,0 +1,5 @@
+tempermonitor (2.0.0) buster; urgency=medium
+
+  * Initial debian release
+
+ -- Michael Loipführer <ml@stusta.de>  Thu, 23 Apr 2020 19:15:18 +0200

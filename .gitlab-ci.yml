@@ -1,0 +1,45 @@
+default:
+  image: debian-python-build:v2
+
+# Is performed before the scripts in the stages step
+before_script:
+  - source /etc/profile
+  # Load the ssh private key from the gitlab build variables to enable dupload
+  # to connect to the repo via scp
+  - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+  - eval $(ssh-agent -s)
+  - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - ssh-keyscan repo.stusta.mhn.de >> ~/.ssh/known_hosts
+  - chmod 644 ~/.ssh/known_hosts
+
+# Defines stages which are to be executed
+stages:
+  - build_buster
+  - upload_to_repo
+
+# Stage "build_buster"
+build_buster:
+  stage: build_buster
+  script:
+    - apt update
+    - apt install -y python3-stdeb python-all
+    - dpkg-buildpackage -us -uc
+    - mkdir -p build/
+    - mv deb_dist/* build/
+
+  # The files which are to be made available in GitLab
+  artifacts:
+    paths:
+      - build/*
+
+upload_to_repo:
+  stage: upload_to_repo
+  script:
+    - echo "Uploading debian package to ssn repository"
+    - ssh repo@repo.stusta.mhn.de "echo SSH-Connection working"
+    - dupload -f -t ssn_repo build/tempermonitor*.changes
+  when: manual
+  only:
+    - master

@@ -1,0 +1,31 @@
+Source: tempermonitor
+Maintainer: Michael Loipführer <ml@stusta.de>
+Section: python
+Priority: optional
+Build-Depends: python3-setuptools, python3-all, debhelper (>= 7)
+Standards-Version: 3.9.1
+Package: python3-tempermonitor
+Architecture: all
+Depends: ${misc:Depends}, ${python3:Depends}
+Description: Tempermonitor sensor temperature reading deamon
+ This is the StuStaNet Temperature Monitoring System.
+ .
+ # Hardware Setup and Protocol
+ .
+ The temperature sensors are ds18x20 sensors connected via the onewire protocol
+ to an esp32. The esp is connected via usb-serial to the host computer.
+ This sends roughly every second a measurement value from one of the sensors.
+ After a complete round it sends an empty line.
+ .
+ # Dependencies
+ .
+ pyserial-asyncio. And >=python3.5.
+ .
+ # Architecture
+ The communications is done within the temperature_daemon.py file as well as
+ error handling for the sensor measurements.
+ It will then call functions in plugins to do the majority of the work.
+ .
+ The plugins are located in the `plugins` folder.
+ .
+
