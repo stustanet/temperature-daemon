@@ -126,14 +126,14 @@ class PluginMail:
         # Ratelimit the emails
         time_since_last_mail = time.time() - self._mail_rate_limit.get(subject, 0)
         if time_since_last_mail < int(self.config['mail']['min_delay_between_messages']):
-            print("Not sending due to ratelimiting")
+            print("Not sending due to ratelimiting: %i", time_since_last_mail)
             return
 
         print("Body: {}".format(body))
 
         self._mail_rate_limit[subject] = time.time()
         smtp = smtplib.SMTP("mail.stusta.mhn.de")
-        # smtp.sendmail(msg['From'], recipients, msg.as_string())
+        smtp.sendmail(msg['From'], recipients, msg.as_string())
         smtp.quit()
 
     async def err_nodata(self, **kwargs):

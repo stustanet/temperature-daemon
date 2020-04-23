@@ -110,10 +110,16 @@ class TempMonitor:
         """
         Connect to the ESP chip
         """
-        self._reader, self._writer = await serial_asyncio.open_serial_connection(
-            url=self.config['serial']['port'],
-            baudrate=self.config['serial']['baudrate'],
-            loop=self.loop)
+        try:
+            self._reader, self._writer = await serial_asyncio.open_serial_connection(
+                url=self.config['serial']['port'],
+                baudrate=self.config['serial']['baudrate'],
+                loop=self.loop)
+        except serial.SerialException:
+            print("Connection failed!")
+            self.loop.stop()
+            raise
+
         # upon startup we only see garbage. (micropython starting up),
         # also it will produce warnings if the recording is started in the middle
         # of a message, so wait until the end of a message block to start the game
@@ -133,17 +139,23 @@ class TempMonitor:
         await self.reconnect()
         last_valid_data_received = time.time()
         line = ""
+        reconnected_on_error = False
         while True:
             # Wait for the next line
 
-            if time.time() - last_valid_data_received > 1800:
+            if time.time() - last_valid_data_received > 10:
                 await self.call_plugin("err_no_valid_data", last_line=line)
+                if not reconnected_on_error:
+                    reconnected_on_error = True
+                    await self.reconnect()
 
             try:
                 line = await asyncio.wait_for(
                     self._reader.readline(),
                     timeout=int(self.config['serial']['timeout']))
+                print("Received: ", line)
             except asyncio.TimeoutError:
+                print("No Data")
                 await self.call_plugin("err_nodata")
                 continue
             except serial.SerialException as exc:
@@ -154,13 +166,17 @@ class TempMonitor:
             try:
                 line = line.decode('ascii').strip()
             except UnicodeError:
+                print("Unicode error")
                 continue
             # print("recv:", line)
 
             if line == '':
                 # Block has ended
+                print("Done block, storing sensors")
                 await self.store_sensors()
+                print("Done")
                 continue
+
             # Try to parse the line
             try:
                 owid, temp = line.split(' ')
@@ -171,15 +187,18 @@ class TempMonitor:
 
             ## we have at least a valid line
             last_valid_data_received = time.time()
+            reconnected_on_error = False
 
             sensor = self.sensors.get(owid, None)
             if not sensor:
                 # If the sensor is new - notify the operators
+                print("Unknown sensor")
                 await self.call_plugin("err_unknown_sensor",
                                        config=self._configname,
                                        owid=owid,
                                        temp=temp)
             elif temp > 1000 or temp < -1000:
+                print("Sensor invalid")
                 sensor.valid = False
                 # if the sensor is giving bullshit data - notify the operators
                 await self.call_plugin("err_problem_sensor",
