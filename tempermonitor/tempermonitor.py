@@ -268,7 +268,7 @@ def main():
     """
     loop = asyncio.get_event_loop()
 
-    configfile = "/etc/temperature/tempermon.ini"
+    configfile = "/etc/tempermonitor.ini"
     if len(sys.argv) == 2:
         configfile = sys.argv[1]
 
