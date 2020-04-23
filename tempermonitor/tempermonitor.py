@@ -21,13 +21,11 @@ import asyncio
 import configparser
 import sys
 import time
-import importlib
 from datetime import datetime
-from pathlib import Path
 import serial_asyncio
 import serial
 
-from tempermonitor.plugins import PLUGINS
+from .plugins import PLUGINS
 
 
 class Sensor:

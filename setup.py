@@ -1,6 +1,6 @@
 from setuptools import setup
 
-VERSION = '2.0.4'
+VERSION = '2.0.5'
 
 
 def readme():
@@ -26,7 +26,10 @@ setup(
         'prometheus_client'
     ],
     license='MIT',
-    packages=['tempermonitor'],
+    packages=[
+        'tempermonitor',
+        'tempermonitor.plugins'
+    ],
     include_package_data=True,
     zip_safe=False
 )
