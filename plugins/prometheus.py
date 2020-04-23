@@ -28,13 +28,15 @@ class PluginPrometheus:
 
         start_http_server(
             addr=self.config["prometheus"].get('address', 'localhost'),
-            port=self.config["prometheus"]["port"]
+            port=int(self.config["prometheus"]["port"])
         )
+        print("started prometheus http server")
 
     async def update_sensor_values(self, sensor):
         """
         update
         """
+        print("updating prometheus metrics")
         self.sensor_metrics.labels(sensor=sensor.name).set(sensor.temperature)
 
     async def send_stats_graph(self, graph, stattype, stattime, statval):
