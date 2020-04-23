@@ -5,7 +5,7 @@ Priority: optional
 Build-Depends: python3-setuptools, python3-all, debhelper (>= 11)
 Standards-Version: 4.2.1
 
-Package: python3-tempermonitor
+Package: tempermonitor
 Homepage: https://gitlab.stusta.de/stustanet/temperature-daemon
 Vcs-Browser: https://gitlab.stusta.de/stustanet/temperature-daemon
 Vcs-Git: https://gitlab.stusta.de/stustanet/temperature-daemon.git
