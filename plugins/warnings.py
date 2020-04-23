@@ -1,19 +1,22 @@
 import time
 
+
 def init(monitor):
     """ Plugin interface method """
     return PluginWarning(monitor)
+
 
 class PluginWarning:
     """
     Generate all kind of warnings whenever needed and observe the sensor
     if they see a problematic situation in the container
     """
+
     def __init__(self, monitor):
         self.monitor = monitor
 
         self.revmapping = {
-            sensor.name : sensor
+            sensor.name: sensor
             for sensor in self.monitor.sensors.values()
         }
 
@@ -44,7 +47,7 @@ class PluginWarning:
             return [], 0, 0, 0, 0
 
         avg = sum(sensor.temperature for sensor in sensors) / len(sensors)
-        var = sum((sensor.temperature - avg)**2 for sensor in sensors) / len(sensors)
+        var = sum((sensor.temperature - avg) ** 2 for sensor in sensors) / len(sensors)
 
         sensormin = +9999
         sensormax = -9999
@@ -55,7 +58,6 @@ class PluginWarning:
                 sensormax = sensor.temperature
 
         return sensors, sensormin, sensormax, avg, var
-
 
     async def sensor_update(self):
         """
@@ -74,30 +76,30 @@ class PluginWarning:
         if floor_sensors:
             await self.monitor.call_plugin(
                 "send_stats_graph", graph="stats",
-                stattype="temperature-floormin", stattime=now, statval=floor_min)
+                stattype="temperature-floor-min", stattime=now, statval=floor_min)
             await self.monitor.call_plugin(
                 "send_stats_graph", graph="stats",
-                stattype="temperature-floormax", stattime=now, statval=floor_max)
+                stattype="temperature-floor-max", stattime=now, statval=floor_max)
             await self.monitor.call_plugin(
                 "send_stats_graph", graph="stats",
-                stattype="temperature-flooravg", stattime=now, statval=floor_avg)
+                stattype="temperature-floor-avg", stattime=now, statval=floor_avg)
             await self.monitor.call_plugin(
                 "send_stats_graph", graph="stats",
-                stattype="temperature-floorvar", stattime=now, statval=floor_var)
+                stattype="temperature-floor-var", stattime=now, statval=floor_var)
 
         if ceil_sensors:
             await self.monitor.call_plugin(
                 "send_stats_graph", graph="stats",
-                stattype="temperature-ceilmin", stattime=now, statval=ceil_min)
+                stattype="temperature-ceil-min", stattime=now, statval=ceil_min)
             await self.monitor.call_plugin(
                 "send_stats_graph", graph="stats",
-                stattype="temperature-ceilmax", stattime=now, statval=ceil_max)
+                stattype="temperature-ceil-max", stattime=now, statval=ceil_max)
             await self.monitor.call_plugin(
                 "send_stats_graph", graph="stats",
-                stattype="temperature-ceilavg", stattime=now, statval=ceil_avg)
+                stattype="temperature-ceil-avg", stattime=now, statval=ceil_avg)
             await self.monitor.call_plugin(
                 "send_stats_graph", graph="stats",
-                stattype="temperature-ceilvar", stattime=now, statval=ceil_var)
+                stattype="temperature-ceil-var", stattime=now, statval=ceil_var)
 
         if floor_sensors and ceil_sensors:
             # Else we already have sent warning messages for broken sensors
@@ -111,7 +113,6 @@ class PluginWarning:
                 floor_min, floor_max, floor_avg, floor_var))
             print("ceil:  min {:05.2f} max {:05.2f} avg {:05.2f} var {:05.2f}".format(
                 ceil_min, ceil_max, ceil_avg, ceil_var))
-
 
             # Here comes the warning magic
 
@@ -132,7 +133,7 @@ class PluginWarning:
 
             # Warning: temperature difference > threshold (sane default: 17)
             if ceil_max > int(self.warning_conf['min_ceiling_warning']):
-                if  tempdiff > int(self.warning_conf['floor_ceiling_diff']):
+                if tempdiff > int(self.warning_conf['floor_ceiling_diff']):
                     await self.monitor.call_plugin("temperature_warning",
                                                    source="tempdiff",
                                                    name1="floor",
@@ -140,4 +141,3 @@ class PluginWarning:
                                                    temp1=floor_avg,
                                                    temp2=ceil_avg,
                                                    tempdiff=tempdiff)
-

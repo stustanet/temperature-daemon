@@ -71,6 +71,22 @@ I will try to fix this issue by reconnecting...
 Regards, Temperature
 """
 
+SENSOR_TEMPERATURE_WARNING_SUBJECT = "Temperaturwarnung Serverraum"
+SENSOR_TEMPERATURE_WARNING_BODY = """Hi Guys,
+
+Die Temperaturen im Serverraum werden langsam Bedenklich:
+
+{temperatures}
+
+Auslöser: {reason}
+
+Aktuelle Temperaturen:
+{alltemperatures}
+
+Bitte haltet die Temperaturen im Auge und fahrt eventuell heiß laufende Server herunter
+
+with love,
+Temperator"""
 
 
 def init(monitor):
@@ -79,10 +95,12 @@ def init(monitor):
     """
     return PluginMail(monitor)
 
+
 class PluginMail:
     """
     Handle all the mail sending stuff
     """
+
     def __init__(self, monitor):
         self.monitor = monitor
         self.config = self.monitor.config
@@ -115,7 +133,7 @@ class PluginMail:
 
         self._mail_rate_limit[subject] = time.time()
         smtp = smtplib.SMTP("mail.stusta.mhn.de")
-        #smtp.sendmail(msg['From'], recipients, msg.as_string())
+        # smtp.sendmail(msg['From'], recipients, msg.as_string())
         smtp.quit()
 
     async def err_nodata(self, **kwargs):
@@ -143,26 +161,7 @@ class PluginMail:
             SENSOR_MEASUREMENT_MISSED_SUBJECT,
             SENSOR_MEASUREMENT_MISSED_BODY.format(**kwargs))
 
-
     async def temperature_warning(self, source, urgent=False, **kwargs):
-        subject = "Temperaturwarnung Serverraum"
-
-        body = """Hi Guys,
-
-Die Temperaturen im Serverraum werden langsam Bedenklich:
-
-{temperatures}
-
-Auslöser: {reason}
-
-Aktuelle Temperaturen:
-{alltemperatures}
-
-Bitte haltet die Temperaturen im Auge und fahrt eventuell heiß laufende Server herunter
-
-with love,
-Temperator"""
-
         if source == "tempdiff":
             temperatures = "{name1}:{temp1}\n{name2}:{temp2}".format(**kwargs)
             reason = "Differenztemperatur: {tempdiff}".format(**kwargs)
@@ -173,8 +172,13 @@ Temperator"""
         alltemperatures = '\n'.join([
             "{}: {}".format(sensor.name, sensor.temperature) if sensor.valid
             else "{}: INVALID".format(sensor.name)
-            for sensor in self.monitor.sensors.values() ])
+            for sensor in self.monitor.sensors.values()])
 
-        await self.send_mail(subject, body.format(
-            temperatures=temperatures, reason=reason, alltemperatures=alltemperatures),
-            urgent=urgent)
+        await self.send_mail(
+            SENSOR_TEMPERATURE_WARNING_SUBJECT,
+            SENSOR_TEMPERATURE_WARNING_BODY.format(
+                temperatures=temperatures,
+                reason=reason,
+                alltemperatures=alltemperatures),
+            urgent=urgent
+        )

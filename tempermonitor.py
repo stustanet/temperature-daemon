@@ -9,6 +9,7 @@ under the terms as stated in the LICENSE.md file.
 Changelog:
 
 2018-08 jotweh: reimplemented using a micropython-esp32
+2020-04 milo: added prometheus plugin
 
 Open issues:
 
@@ -26,25 +27,28 @@ from pathlib import Path
 import serial_asyncio
 import serial
 
+
 class Sensor:
     """
-    One instance as sensor posing as measurementproxy
+    One instance as sensor posing as measurement proxy
     """
+
     def __init__(self, config, owid):
         self.temperature = None
         self.last_update = 0
         self.calibration = 0
         self.valid = True
 
-        try:
-            if owid in config:
-                self.name = config[owid]['name']
-                self.calibration = config[owid]['calibration']
-            else:
-                print("Invalid Config: missing section {}".format(owid))
-        except KeyError as exc:
-            print("Invalid Config: for {}: {}".format(owid, exc))
-            raise
+        if owid not in config:
+            print(f"Invalid Config: missing section {owid}")
+            return
+
+        if 'name' not in config[owid] and 'calibration' not in config[owid]:
+            print(f"Invalid Config for: {owid}")
+            raise RuntimeError(f"Invalid Config for: {owid}")
+
+        self.name = config[owid]['name']
+        self.calibration = config[owid]['calibration']
 
     def update(self, temperature):
         """
@@ -52,6 +56,7 @@ class Sensor:
         """
         self.temperature = float(temperature)
         self.last_update = time.time()
+
 
 class TempMonitor:
     """
@@ -131,7 +136,7 @@ class TempMonitor:
             # Wait for the next line
 
             if time.time() - last_valid_data_received > 1800:
-                self.call_plugin("err_no_valid_data", last_line=line)
+                await self.call_plugin("err_no_valid_data", last_line=line)
 
             try:
                 line = await asyncio.wait_for(
@@ -149,8 +154,7 @@ class TempMonitor:
                 line = line.decode('ascii').strip()
             except UnicodeError:
                 continue
-            #print("recv:", line)
-
+            # print("recv:", line)
 
             if line == '':
                 # Block has ended
@@ -237,6 +241,7 @@ def setup_plugin(filename, plugin):
     if not getattr(plugin, "name", None):
         plugin.name = filename
 
+
 def main():
     """
     Start the tempmonitor
@@ -252,8 +257,11 @@ def main():
 
     plugin_path = Path(__file__).resolve().parent / "plugins"
     print("Loading plugins from {}".format(plugin_path))
+    active_plugins = monitor.config["general"]["plugins"].split(",")
+    print(f"Active plugins: {active_plugins}")
+
     for filename in plugin_path.glob("*.py"):
-        if (plugin_path / filename).exists():
+        if (plugin_path / filename).exists() and filename.name in active_plugins:
             print("loading {}".format(filename.name))
             modname = "plugins." + filename.name.split('.')[0]
             module = importlib.import_module(modname)
@@ -268,6 +276,7 @@ def main():
         pass
     finally:
         loop.run_until_complete(monitor.teardown())
+
 
 if __name__ == "__main__":
     main()

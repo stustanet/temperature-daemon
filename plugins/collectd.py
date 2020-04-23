@@ -1,13 +1,16 @@
 import asyncio
 import time
 
+
 def init(monitor):
     return PluginCollectd(monitor)
+
 
 class PluginCollectd:
     """
     Implements a super simple collectd interface for only sending temperature data
     """
+
     def __init__(self, monitor):
         self.loop = asyncio.get_event_loop()
         self.config = monitor.config
@@ -48,7 +51,7 @@ class PluginCollectd:
             interval,
             timestamp,
             value)
-        #print("Sending data:", data.strip())
+        # print("Sending data:", data.strip())
         self._writer.write(data.encode('utf-8'))
         await self._writer.drain()
 
@@ -63,7 +66,7 @@ class PluginCollectd:
             await self.reconnect()
         else:
             pass
-            #print("recv:", line)
+            # print("recv:", line)
 
     async def send_sensor_values(self, sensor):
         """
