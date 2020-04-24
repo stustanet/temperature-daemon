@@ -104,7 +104,7 @@ class Warnings(Plugin):
             tempdiff = ceil_avg - floor_avg
             await self.monitor.call_plugin(
                 "send_stats_graph", graph="stats",
-                stattype="temperature-floor_ceil_diff", stattime=now, statval=tempdiff)
+                stattype="temperature-floor_ceil-diff", stattime=now, statval=tempdiff)
 
             print("floor: min {:05.2f} max {:05.2f} avg {:05.2f} var {:05.2f}".format(
                 floor_min, floor_max, floor_avg, floor_var))

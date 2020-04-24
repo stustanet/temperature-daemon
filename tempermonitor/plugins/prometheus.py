@@ -1,7 +1,10 @@
+import re
 import asyncio
 from prometheus_client import start_http_server, Gauge
 
 from . import Plugin
+
+stats_name_re = re.compile(r'^temperature-(?P<group>\w+)-(?P<type>\w+)$')
 
 
 class Prometheus(Plugin):
@@ -29,20 +32,15 @@ class Prometheus(Plugin):
         )
         print("started prometheus http server")
 
-    async def update_sensor_values(self, sensor):
-        """
-        update
-        """
-        print("updating prometheus metrics")
-        self.sensor_metrics.labels(sensor=sensor.name).set(sensor.temperature)
-
     async def send_stats_graph(self, graph, stattype, stattime, statval):
         """
         to be called as a plugin callback to export aggregated measurements
         """
-        label_group = stattype.split("-")[1]
-        label_type = stattype.split("-")[2]
-        self.aggregated_metrics.labels(group=label_group, type=label_type).set(statval)
+        m = stats_name_re.match(stattype)
+        if not m:
+            return
+
+        self.aggregated_metrics.labels(group=m.group('group'), type=m.group('type')).set(statval)
 
     async def sensor_update(self):
         """
@@ -50,4 +48,4 @@ class Prometheus(Plugin):
         """
         for sensor in self.monitor.sensors.values():
             if sensor.valid:
-                await self.update_sensor_values(sensor)
+                self.sensor_metrics.labels(sensor=sensor.name).set(sensor.temperature)

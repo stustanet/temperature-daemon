@@ -1,6 +1,6 @@
 from setuptools import setup
 
-VERSION = '2.0.5'
+VERSION = '2.0.6'
 
 
 def readme():
