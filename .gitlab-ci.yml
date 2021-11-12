@@ -1,5 +1,5 @@
 default:
-  image: debian-python-build:v2
+  image: debian-build-python:bullseye
 
 # Is performed before the scripts in the stages step
 before_script:
@@ -16,12 +16,12 @@ before_script:
 
 # Defines stages which are to be executed
 stages:
-  - build_buster
+  - build_bullseye
   - upload_to_repo
 
-# Stage "build_buster"
-build_buster:
-  stage: build_buster
+# Stage "build_bullseye"
+build_bullseye:
+  stage: build_bullseye
   script:
     - apt update
     - apt install -y python3-stdeb python-all
