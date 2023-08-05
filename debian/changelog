@@ -1,3 +1,9 @@
+tempermonitor (2.1.1) bullseye; urgency=medium
+
+  * fix for python 3.11
+
+ -- Wolfgang Walter <wolfgang.walter@stusta.de>  Sun, 06 Aug 2023 00:21:00 +0200
+
 tempermonitor (2.1.0) bullseye; urgency=medium
 
   * upgrade to bullseye
