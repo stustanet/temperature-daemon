@@ -10,11 +10,10 @@ class Collectd(Plugin):
     """
 
     def __init__(self, monitor):
-        self.loop = asyncio.get_event_loop()
         self.config = monitor.config
         self.path = self.config['collectd']['socketpath']
         self._reader, self._writer = (None, None)
-        self.loop.run_until_complete(self.reconnect())
+        asyncio.run(self.reconnect())
 
         self.monitor = monitor
 
@@ -28,8 +27,7 @@ class Collectd(Plugin):
             self._writer.close()
 
         self._reader, self._writer = await asyncio.open_unix_connection(
-            path=self.path,
-            loop=self.loop)
+            path=self.path)
 
     async def _send(self, identifier, interval, timestamp, value):
         """
